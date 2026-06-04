@@ -1,0 +1,40 @@
+{
+  "name": "ripple-st-client",
+  "version": "0.1.0",
+  "description": "WebSocket client for the Ripple event bus protocol",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "rollup -c && cp src/index.d.ts dist/index.d.ts",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "websocket",
+    "event-bus",
+    "pubsub",
+    "ripple"
+  ],
+  "author": "Masashi Umezawa",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-terser": "^1.0.0",
+    "eslint": "^9.0.0",
+    "rollup": "^4.0.0",
+    "vitest": "^4.0.0"
+  }
+}

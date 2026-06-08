@@ -10,7 +10,8 @@
 /**
  * @typedef {Object} RippleError
  * @property {'err'} type
- * @property {string} code
+ * @property {string} failureType
+ * @property {number} failureCode
  * @property {string} message
  * @property {string} [correlationId]
  */

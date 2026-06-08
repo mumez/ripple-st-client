@@ -8,7 +8,8 @@ export interface RippleOptions {
 
 export interface RippleError {
   type: "err";
-  code: string;
+  failureType: string;
+  failureCode: number;
   message: string;
   correlationId?: string;
 }

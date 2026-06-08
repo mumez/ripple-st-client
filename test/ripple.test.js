@@ -102,7 +102,7 @@ describe("Ripple", () => {
     const callback = vi.fn();
     ripple.request("test.request", {}, callback);
 
-    const errMsg = { type: "err", code: "NOT_FOUND", message: "not found", correlationId: "test-uuid" };
+    const errMsg = { type: "err", failureType: "NoSession", failureCode: 404, message: "not found", correlationId: "test-uuid" };
     MockWebSocket.instance.triggerMessage(errMsg);
     expect(callback).toHaveBeenCalledWith(null, errMsg);
   });
@@ -137,7 +137,39 @@ describe("Ripple", () => {
   it("calls onError handler for unhandled err messages", () => {
     const onError = vi.fn();
     const ripple = openRipple({ onError });
-    MockWebSocket.instance.triggerMessage({ type: "err", code: "INTERNAL", message: "oops" });
+    MockWebSocket.instance.triggerMessage({ type: "err", failureType: "HandlerError", failureCode: 500, message: "oops" });
     expect(onError).toHaveBeenCalledOnce();
+  });
+
+  it("calls onError with correct RippleError shape", () => {
+    const onError = vi.fn();
+    const ripple = openRipple({ onError });
+    const err = { type: "err", failureType: "NoSession", failureCode: 404, message: "Session not found" };
+    MockWebSocket.instance.triggerMessage(err);
+    expect(onError).toHaveBeenCalledWith(err);
+  });
+
+  it("calls onError for Forbidden error", () => {
+    const onError = vi.fn();
+    const ripple = openRipple({ onError });
+    const err = { type: "err", failureType: "Forbidden", failureCode: 403, message: "Client publish not allowed" };
+    MockWebSocket.instance.triggerMessage(err);
+    expect(onError).toHaveBeenCalledWith(err);
+  });
+
+  it("calls onError with correct RippleError shape", () => {
+    const onError = vi.fn();
+    const ripple = openRipple({ onError });
+    const err = { type: "err", failureType: "NoSession", failureCode: 404, message: "Session not found" };
+    MockWebSocket.instance.triggerMessage(err);
+    expect(onError).toHaveBeenCalledWith(err);
+  });
+
+  it("calls onError for Forbidden error", () => {
+    const onError = vi.fn();
+    const ripple = openRipple({ onError });
+    const err = { type: "err", failureType: "Forbidden", failureCode: 403, message: "Client publish not allowed" };
+    MockWebSocket.instance.triggerMessage(err);
+    expect(onError).toHaveBeenCalledWith(err);
   });
 });

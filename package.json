@@ -21,8 +21,17 @@
     "build": "rollup -c && cp src/index.d.ts dist/index.d.ts",
     "lint": "eslint src",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mumez/ripple-st-client.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mumez/ripple-st-client/issues"
+  },
+  "homepage": "https://github.com/mumez/ripple-st-client#readme",
   "keywords": [
     "websocket",
     "event-bus",

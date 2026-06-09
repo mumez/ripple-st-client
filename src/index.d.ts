@@ -1,6 +1,7 @@
 export interface RippleOptions {
   headers?: Record<string, string>;
   ping_interval?: number;
+  request_timeout?: number;
   onOpen?: (ripple: Ripple) => void;
   onClose?: (ripple: Ripple) => void;
   onError?: (error: RippleError) => void;
@@ -24,8 +25,8 @@ export declare class Ripple {
 
   state: 0 | 1 | 2 | 3;
   headers: Record<string, string>;
-  subscriptions: Map<string, MessageCallback[]>;
-  pendingRequests: Map<string, MessageCallback>;
+  readonly subscriptions: Map<string, MessageCallback[]>;
+  readonly pendingRequests: Map<string, MessageCallback>;
 
   constructor(url: string, options?: RippleOptions);
 

@@ -176,6 +176,62 @@ describe("Ripple", () => {
     expect(onError).toHaveBeenCalledWith(err);
   });
 
+  // Security (medium): headers isolation
+  it("does not reflect external mutation of options.headers in sent messages", () => {
+    const headers = { "x-token": "initial" };
+    const ripple = openRipple({ headers });
+    headers["x-token"] = "mutated";
+    ripple.send("addr", {});
+    expect(MockWebSocket.instance.sent.at(-1).headers["x-token"]).toBe("initial");
+  });
+
+  // Security (medium): request timeout
+  it("calls callback with timeout error when request_timeout elapses without a reply", () => {
+    vi.useFakeTimers();
+    try {
+      const ripple = openRipple({ request_timeout: 1000 });
+      const callback = vi.fn();
+      ripple.request("addr", {}, callback);
+      vi.advanceTimersByTime(1001);
+      expect(callback).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({ type: "err", failureType: "RequestTimeout" }),
+      );
+      expect(ripple.pendingRequests.has("test-uuid")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not fire timeout callback when a reply arrives before the timeout", () => {
+    vi.useFakeTimers();
+    try {
+      const ripple = openRipple({ request_timeout: 1000 });
+      const callback = vi.fn();
+      ripple.request("addr", {}, callback);
+      MockWebSocket.instance.triggerMessage({ type: "reply", correlationId: "test-uuid", body: { ok: true } });
+      vi.advanceTimersByTime(1001);
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith({ ok: true }, null);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not fire timeout callback after close()", () => {
+    vi.useFakeTimers();
+    try {
+      const ripple = openRipple({ request_timeout: 1000 });
+      const callback = vi.fn();
+      ripple.request("addr", {}, callback);
+      ripple.close();
+      vi.advanceTimersByTime(1001);
+      expect(callback).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   // Security: malformed JSON
   it("does not throw when a malformed JSON frame is received", () => {
     openRipple();

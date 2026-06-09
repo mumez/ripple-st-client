@@ -36,7 +36,10 @@ export class Ripple {
     this.subscriptions = new Map();
     /** @type {Map<string, MessageCallback>} */
     this.pendingRequests = new Map();
-    this.headers = options.headers || {};
+    /** @type {Map<string, ReturnType<typeof setTimeout>>} */
+    this._pendingTimers = new Map();
+    this._requestTimeout = options.request_timeout ?? 0;
+    this.headers = { ...(options.headers ?? {}) };
     this.onOpenHandler = options.onOpen || (() => console.log("--open--"));
     this.onCloseHandler = options.onClose || (() => console.log("--close--"));
     this.onErrorHandler = options.onError || ((json) => console.error(json));
@@ -88,6 +91,7 @@ export class Ripple {
       if (type === "reply") {
         const callback = this.pendingRequests.get(json.correlationId);
         if (callback) {
+          this._clearPendingTimer(json.correlationId);
           this.pendingRequests.delete(json.correlationId);
           callback(json.body, null);
         }
@@ -97,6 +101,7 @@ export class Ripple {
       if (type === "err" && json.correlationId) {
         const callback = this.pendingRequests.get(json.correlationId);
         if (callback) {
+          this._clearPendingTimer(json.correlationId);
           this.pendingRequests.delete(json.correlationId);
           callback(null, json);
         }
@@ -164,6 +169,16 @@ export class Ripple {
 
     if (callback) {
       this.pendingRequests.set(correlationId, callback);
+      if (this._requestTimeout > 0) {
+        const timerId = setTimeout(() => {
+          if (this.pendingRequests.has(correlationId)) {
+            this.pendingRequests.delete(correlationId);
+            this._pendingTimers.delete(correlationId);
+            callback(null, { type: "err", failureType: "RequestTimeout", failureCode: 408, message: `Request to "${address}" timed out` });
+          }
+        }, this._requestTimeout);
+        this._pendingTimers.set(correlationId, timerId);
+      }
     }
 
     this.wsock.send(JSON.stringify(envelope));
@@ -243,7 +258,18 @@ export class Ripple {
 
   close() {
     this.state = Ripple.CLOSING;
+    this._pendingTimers.forEach(clearTimeout);
+    this._pendingTimers.clear();
     this.wsock.close();
+  }
+
+  /** @param {string} correlationId */
+  _clearPendingTimer(correlationId) {
+    const timerId = this._pendingTimers.get(correlationId);
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+      this._pendingTimers.delete(correlationId);
+    }
   }
 
   /** @returns {string} */

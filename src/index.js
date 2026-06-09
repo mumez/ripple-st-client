@@ -75,7 +75,7 @@ export class Ripple {
       this.onErrorHandler({
         type: "err",
         failureType: "WebSocketError",
-        failureCode: event?.code ?? 0,
+        failureCode: event?.code ?? -1,
         message: event?.reason || "WebSocket connection error",
       });
     };

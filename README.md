@@ -29,9 +29,10 @@ Opens a WebSocket connection to a Ripple server.
 |--------|------|---------|-------------|
 | `headers` | `Record<string, string>` | `{}` | Headers attached to every outgoing envelope |
 | `ping_interval` | `number` | `10000` | Keepalive ping interval in milliseconds |
+| `request_timeout` | `number` | `0` | Milliseconds before a pending `request()` is cancelled with a `RequestTimeout` error. `0` disables the timeout. |
 | `onOpen` | `(ripple: Ripple) => void` | — | Called when the connection is established |
 | `onClose` | `(ripple: Ripple) => void` | — | Called when the connection is closed |
-| `onError` | `(error: RippleError) => void` | — | Called for unhandled server errors |
+| `onError` | `(error: RippleError) => void` | — | Called for unhandled server errors and WebSocket connection errors |
 
 ---
 

@@ -260,14 +260,14 @@ describe("Ripple", () => {
     });
   });
 
-  it("falls back to failureCode 0 and default message when event has no code or reason", () => {
+  it("falls back to failureCode -1 and default message when event has no code or reason", () => {
     const onError = vi.fn();
     openRipple({ onError });
     MockWebSocket.instance.triggerError({});
     expect(onError).toHaveBeenCalledWith({
       type: "err",
       failureType: "WebSocketError",
-      failureCode: 0,
+      failureCode: -1,
       message: "WebSocket connection error",
     });
   });

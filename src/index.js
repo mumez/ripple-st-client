@@ -71,8 +71,13 @@ export class Ripple {
       this.onCloseHandler(this);
     };
 
-    this.wsock.onerror = () => {
-      this.onErrorHandler({ type: "err", failureType: "WebSocketError", failureCode: 0, message: "WebSocket connection error" });
+    this.wsock.onerror = (event) => {
+      this.onErrorHandler({
+        type: "err",
+        failureType: "WebSocketError",
+        failureCode: event?.code ?? 0,
+        message: event?.reason || "WebSocket connection error",
+      });
     };
 
     this.wsock.onmessage = (e) => {

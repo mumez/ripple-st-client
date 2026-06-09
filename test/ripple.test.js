@@ -248,6 +248,30 @@ describe("Ripple", () => {
     expect(onError).toHaveBeenCalledOnce();
   });
 
+  it("reflects event.code and event.reason in the RippleError passed to onError", () => {
+    const onError = vi.fn();
+    openRipple({ onError });
+    MockWebSocket.instance.triggerError({ code: 1006, reason: "Abnormal closure" });
+    expect(onError).toHaveBeenCalledWith({
+      type: "err",
+      failureType: "WebSocketError",
+      failureCode: 1006,
+      message: "Abnormal closure",
+    });
+  });
+
+  it("falls back to failureCode 0 and default message when event has no code or reason", () => {
+    const onError = vi.fn();
+    openRipple({ onError });
+    MockWebSocket.instance.triggerError({});
+    expect(onError).toHaveBeenCalledWith({
+      type: "err",
+      failureType: "WebSocketError",
+      failureCode: 0,
+      message: "WebSocket connection error",
+    });
+  });
+
   // Security: prototype pollution via correlationId
   it("does not throw when __proto__ is used as correlationId", () => {
     openRipple();

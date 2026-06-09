@@ -32,10 +32,10 @@ export class Ripple {
    */
   constructor(url, options = {}) {
     this.state = Ripple.CONNECTING;
-    /** @type {Record<string, MessageCallback[]>} */
-    this.subscriptions = {};
-    /** @type {Record<string, MessageCallback>} */
-    this.pendingRequests = {};
+    /** @type {Map<string, MessageCallback[]>} */
+    this.subscriptions = new Map();
+    /** @type {Map<string, MessageCallback>} */
+    this.pendingRequests = new Map();
     this.headers = options.headers || {};
     this.onOpenHandler = options.onOpen || (() => console.log("--open--"));
     this.onCloseHandler = options.onClose || (() => console.log("--close--"));
@@ -68,8 +68,17 @@ export class Ripple {
       this.onCloseHandler(this);
     };
 
+    this.wsock.onerror = () => {
+      this.onErrorHandler({ type: "err", failureType: "WebSocketError", failureCode: 0, message: "WebSocket connection error" });
+    };
+
     this.wsock.onmessage = (e) => {
-      const json = JSON.parse(e.data);
+      let json;
+      try {
+        json = JSON.parse(e.data);
+      } catch {
+        return;
+      }
       const { type } = json;
 
       if (type === "pong") {
@@ -77,24 +86,24 @@ export class Ripple {
       }
 
       if (type === "reply") {
-        const callback = this.pendingRequests[json.correlationId];
+        const callback = this.pendingRequests.get(json.correlationId);
         if (callback) {
-          delete this.pendingRequests[json.correlationId];
+          this.pendingRequests.delete(json.correlationId);
           callback(json.body, null);
         }
         return;
       }
 
       if (type === "err" && json.correlationId) {
-        const callback = this.pendingRequests[json.correlationId];
+        const callback = this.pendingRequests.get(json.correlationId);
         if (callback) {
-          delete this.pendingRequests[json.correlationId];
+          this.pendingRequests.delete(json.correlationId);
           callback(null, json);
         }
         return;
       }
 
-      const handlers = this.subscriptions[json.address];
+      const handlers = this.subscriptions.get(json.address);
       if (handlers) {
         handlers.forEach((handler) => {
           if (type === "err") {
@@ -154,7 +163,7 @@ export class Ripple {
     };
 
     if (callback) {
-      this.pendingRequests[correlationId] = callback;
+      this.pendingRequests.set(correlationId, callback);
     }
 
     this.wsock.send(JSON.stringify(envelope));
@@ -198,14 +207,14 @@ export class Ripple {
       throw new Error("INVALID_STATE_ERR");
     }
 
-    if (!this.subscriptions[address]) {
-      this.subscriptions[address] = [];
+    if (!this.subscriptions.has(address)) {
+      this.subscriptions.set(address, []);
       this.wsock.send(
         JSON.stringify({ type: "register", address, headers: this.headers }),
       );
     }
 
-    this.subscriptions[address].push(callback);
+    this.subscriptions.get(address).push(callback);
   }
 
   /**
@@ -217,7 +226,7 @@ export class Ripple {
       throw new Error("INVALID_STATE_ERR");
     }
 
-    const handlers = this.subscriptions[address];
+    const handlers = this.subscriptions.get(address);
     if (handlers) {
       const idx = handlers.indexOf(callback);
       if (idx !== -1) {
@@ -226,7 +235,7 @@ export class Ripple {
           this.wsock.send(
             JSON.stringify({ type: "unregister", address, headers: this.headers }),
           );
-          delete this.subscriptions[address];
+          this.subscriptions.delete(address);
         }
       }
     }

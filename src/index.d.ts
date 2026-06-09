@@ -24,8 +24,8 @@ export declare class Ripple {
 
   state: 0 | 1 | 2 | 3;
   headers: Record<string, string>;
-  subscriptions: Record<string, MessageCallback[]>;
-  pendingRequests: Record<string, MessageCallback>;
+  subscriptions: Map<string, MessageCallback[]>;
+  pendingRequests: Map<string, MessageCallback>;
 
   constructor(url: string, options?: RippleOptions);
 

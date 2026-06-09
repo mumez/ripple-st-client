@@ -21,6 +21,9 @@ class MockWebSocket {
   triggerMessage(data) {
     this.onmessage?.({ data: JSON.stringify(data) });
   }
+  triggerError(event = {}) {
+    this.onerror?.(event);
+  }
 }
 
 beforeEach(() => {
@@ -94,7 +97,7 @@ describe("Ripple", () => {
 
     MockWebSocket.instance.triggerMessage({ type: "reply", correlationId: "test-uuid", body: { result: "ok" } });
     expect(callback).toHaveBeenCalledWith({ result: "ok" }, null);
-    expect(ripple.pendingRequests["test-uuid"]).toBeUndefined();
+    expect(ripple.pendingRequests.has("test-uuid")).toBe(false);
   });
 
   it("request() calls callback with error on err reply", () => {
@@ -126,7 +129,7 @@ describe("Ripple", () => {
 
     const sent = MockWebSocket.instance.sent;
     expect(sent.at(-1)).toMatchObject({ type: "unregister", address: "some.address" });
-    expect(ripple.subscriptions["some.address"]).toBeUndefined();
+    expect(ripple.subscriptions.has("some.address")).toBe(false);
   });
 
   it("throws INVALID_STATE_ERR when not open", () => {
@@ -171,5 +174,37 @@ describe("Ripple", () => {
     const err = { type: "err", failureType: "Forbidden", failureCode: 403, message: "Client publish not allowed" };
     MockWebSocket.instance.triggerMessage(err);
     expect(onError).toHaveBeenCalledWith(err);
+  });
+
+  // Security: malformed JSON
+  it("does not throw when a malformed JSON frame is received", () => {
+    openRipple();
+    expect(() => {
+      MockWebSocket.instance.onmessage?.({ data: "{{not-valid-json" });
+    }).not.toThrow();
+  });
+
+  // Security: WebSocket onerror
+  it("calls onError handler when the WebSocket emits an error event", () => {
+    const onError = vi.fn();
+    openRipple({ onError });
+    MockWebSocket.instance.triggerError({});
+    expect(onError).toHaveBeenCalledOnce();
+  });
+
+  // Security: prototype pollution via correlationId
+  it("does not throw when __proto__ is used as correlationId", () => {
+    openRipple();
+    expect(() => {
+      MockWebSocket.instance.triggerMessage({ type: "reply", correlationId: "__proto__", body: {} });
+    }).not.toThrow();
+  });
+
+  // Security: prototype pollution via address
+  it("does not throw when __proto__ is used as subscription address", () => {
+    openRipple();
+    expect(() => {
+      MockWebSocket.instance.triggerMessage({ type: "publish", address: "__proto__", body: {} });
+    }).not.toThrow();
   });
 });

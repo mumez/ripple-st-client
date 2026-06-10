@@ -113,6 +113,34 @@ Replace the lifecycle handlers after construction.
 
 ---
 
+### Error handling
+
+Errors are delivered in one of three ways depending on their origin:
+
+| Situation | Delivery |
+|-----------|----------|
+| Server returns `err` in response to a `request()` | `callback(null, error)` on that request |
+| Server returns `err` for a subscribed address | `handler(null, error)` on that subscription |
+| Server returns `err` with no matching handler | `onError` callback |
+| WebSocket connection error | `onError` callback |
+| `request()` times out (`request_timeout`) | `callback(null, error)` on that request |
+
+```js
+// Per-request error handling
+ripple.request("users.find", { id: 42 }, (user, err) => {
+  if (err) {
+    console.error(err.failureType, err.message); // e.g. "HandlerError" "…"
+    return;
+  }
+  console.log(user.name);
+});
+
+// Global fallback for unhandled errors
+const ripple = new Ripple(url, {
+  onError: (err) => console.error(`[${err.failureCode}] ${err.message}`),
+});
+```
+
 ### `RippleError`
 
 ```ts
@@ -121,9 +149,26 @@ interface RippleError {
   failureType: string;
   failureCode: number;
   message: string;
-  correlationId?: string;
+  correlationId?: string; // present only on errors from a request()
 }
 ```
+
+**Server-side `failureType` values:**
+
+| `failureType` | `failureCode` | Cause |
+|---------------|---------------|-------|
+| `NoSession` | 404 | No session registered for this connection |
+| `Forbidden` | 403 | `publish` rejected because `allowClientPublish` is `false` on the server |
+| `HandlerError` | 500 | Application handler threw an unhandled exception |
+| `general` | 0 | Generic server-side error |
+| `application` | 10000 | Application-level error raised by the handler |
+
+**Client-side `failureType` values** (synthesised locally, not received over the wire):
+
+| `failureType` | `failureCode` | Cause |
+|---------------|---------------|-------|
+| `WebSocketError` | event code / `-1` | Underlying WebSocket connection error |
+| `RequestTimeout` | 408 | `request()` received no reply within `request_timeout` ms |
 
 ## License
 

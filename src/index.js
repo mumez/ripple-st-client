@@ -1,19 +1,40 @@
 /**
  * @typedef {Object} RippleOptions
  * @property {Record<string, string>} [headers]
- * @property {number} [ping_interval]
+ * @property {number} [ping_interval] - Keepalive ping interval in ms (default 10000).
+ * @property {number} [request_timeout] - If > 0, pending `request()` calls that receive no reply
+ *   within this many milliseconds are rejected with a `RequestTimeout` error (default 0 = disabled).
  * @property {(ripple: Ripple) => void} [onOpen]
  * @property {(ripple: Ripple) => void} [onClose]
  * @property {(error: RippleError) => void} [onError]
  */
 
 /**
+ * Error envelope received from the server or synthesised by the client.
+ *
+ * **Server-side `failureType` values** (set by the Ripple server):
+ *
+ * | `failureType`    | `failureCode` | Cause |
+ * |------------------|---------------|-------|
+ * | `NoSession`      | 404           | No session (ripple) is registered for this connection |
+ * | `Forbidden`      | 403           | `publish` rejected because `allowClientPublish` is `false` on the server |
+ * | `HandlerError`   | 500           | Application handler threw an unhandled exception |
+ * | `general`        | 0             | Generic server-side error |
+ * | `application`    | 10000         | Application-level error explicitly raised by the handler |
+ *
+ * **Client-side `failureType` values** (synthesised locally, never sent over the wire):
+ *
+ * | `failureType`    | `failureCode`   | Cause |
+ * |------------------|-----------------|-------|
+ * | `WebSocketError` | event code / -1 | Underlying WebSocket connection error (`wsock.onerror`) |
+ * | `RequestTimeout` | 408             | `request()` received no reply within `request_timeout` ms |
+ *
  * @typedef {Object} RippleError
- * @property {'err'} type
- * @property {string} failureType
- * @property {number} failureCode
- * @property {string} message
- * @property {string} [correlationId]
+ * @property {'err'} type - Always `"err"`.
+ * @property {string} failureType - Machine-readable error category (see table above).
+ * @property {number} failureCode - Numeric code paired with `failureType`.
+ * @property {string} message - Human-readable description.
+ * @property {string} [correlationId] - Present only when the error originates from a `request` call.
  */
 
 /**
@@ -157,6 +178,7 @@ export class Ripple {
    * @param {string} address
    * @param {unknown} message
    * @param {MessageCallback} [callback]
+   * @throws {Error} `"INVALID_STATE_ERR"` if the connection is not open.
    */
   request(address, message, callback) {
     if (this.state !== Ripple.OPEN) {
@@ -193,6 +215,7 @@ export class Ripple {
    * One-way send with no reply expected.
    * @param {string} address
    * @param {unknown} message
+   * @throws {Error} `"INVALID_STATE_ERR"` if the connection is not open.
    */
   send(address, message) {
     if (this.state !== Ripple.OPEN) {
@@ -207,6 +230,7 @@ export class Ripple {
   /**
    * @param {string} address
    * @param {unknown} message
+   * @throws {Error} `"INVALID_STATE_ERR"` if the connection is not open.
    */
   publish(address, message) {
     if (this.state !== Ripple.OPEN) {
@@ -221,6 +245,7 @@ export class Ripple {
   /**
    * @param {string} address
    * @param {MessageCallback} callback
+   * @throws {Error} `"INVALID_STATE_ERR"` if the connection is not open.
    */
   registerHandler(address, callback) {
     if (this.state !== Ripple.OPEN) {
@@ -240,6 +265,7 @@ export class Ripple {
   /**
    * @param {string} address
    * @param {MessageCallback} callback
+   * @throws {Error} `"INVALID_STATE_ERR"` if the connection is not open.
    */
   unregisterHandler(address, callback) {
     if (this.state !== Ripple.OPEN) {

@@ -21,6 +21,9 @@ class MockWebSocket {
   triggerMessage(data) {
     this.onmessage?.({ data: JSON.stringify(data) });
   }
+  triggerError(event = {}) {
+    this.onerror?.(event);
+  }
 }
 
 beforeEach(() => {
@@ -94,7 +97,7 @@ describe("Ripple", () => {
 
     MockWebSocket.instance.triggerMessage({ type: "reply", correlationId: "test-uuid", body: { result: "ok" } });
     expect(callback).toHaveBeenCalledWith({ result: "ok" }, null);
-    expect(ripple.pendingRequests["test-uuid"]).toBeUndefined();
+    expect(ripple.pendingRequests.has("test-uuid")).toBe(false);
   });
 
   it("request() calls callback with error on err reply", () => {
@@ -126,7 +129,7 @@ describe("Ripple", () => {
 
     const sent = MockWebSocket.instance.sent;
     expect(sent.at(-1)).toMatchObject({ type: "unregister", address: "some.address" });
-    expect(ripple.subscriptions["some.address"]).toBeUndefined();
+    expect(ripple.subscriptions.has("some.address")).toBe(false);
   });
 
   it("throws INVALID_STATE_ERR when not open", () => {
@@ -171,5 +174,117 @@ describe("Ripple", () => {
     const err = { type: "err", failureType: "Forbidden", failureCode: 403, message: "Client publish not allowed" };
     MockWebSocket.instance.triggerMessage(err);
     expect(onError).toHaveBeenCalledWith(err);
+  });
+
+  // Security (medium): headers isolation
+  it("does not reflect external mutation of options.headers in sent messages", () => {
+    const headers = { "x-token": "initial" };
+    const ripple = openRipple({ headers });
+    headers["x-token"] = "mutated";
+    ripple.send("addr", {});
+    expect(MockWebSocket.instance.sent.at(-1).headers["x-token"]).toBe("initial");
+  });
+
+  // Security (medium): request timeout
+  it("calls callback with timeout error when request_timeout elapses without a reply", () => {
+    vi.useFakeTimers();
+    try {
+      const ripple = openRipple({ request_timeout: 1000 });
+      const callback = vi.fn();
+      ripple.request("addr", {}, callback);
+      vi.advanceTimersByTime(1001);
+      expect(callback).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({ type: "err", failureType: "RequestTimeout" }),
+      );
+      expect(ripple.pendingRequests.has("test-uuid")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not fire timeout callback when a reply arrives before the timeout", () => {
+    vi.useFakeTimers();
+    try {
+      const ripple = openRipple({ request_timeout: 1000 });
+      const callback = vi.fn();
+      ripple.request("addr", {}, callback);
+      MockWebSocket.instance.triggerMessage({ type: "reply", correlationId: "test-uuid", body: { ok: true } });
+      vi.advanceTimersByTime(1001);
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith({ ok: true }, null);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not fire timeout callback after close()", () => {
+    vi.useFakeTimers();
+    try {
+      const ripple = openRipple({ request_timeout: 1000 });
+      const callback = vi.fn();
+      ripple.request("addr", {}, callback);
+      ripple.close();
+      vi.advanceTimersByTime(1001);
+      expect(callback).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // Security: malformed JSON
+  it("does not throw when a malformed JSON frame is received", () => {
+    openRipple();
+    expect(() => {
+      MockWebSocket.instance.onmessage?.({ data: "{{not-valid-json" });
+    }).not.toThrow();
+  });
+
+  // Security: WebSocket onerror
+  it("calls onError handler when the WebSocket emits an error event", () => {
+    const onError = vi.fn();
+    openRipple({ onError });
+    MockWebSocket.instance.triggerError({});
+    expect(onError).toHaveBeenCalledOnce();
+  });
+
+  it("reflects event.code and event.reason in the RippleError passed to onError", () => {
+    const onError = vi.fn();
+    openRipple({ onError });
+    MockWebSocket.instance.triggerError({ code: 1006, reason: "Abnormal closure" });
+    expect(onError).toHaveBeenCalledWith({
+      type: "err",
+      failureType: "WebSocketError",
+      failureCode: 1006,
+      message: "Abnormal closure",
+    });
+  });
+
+  it("falls back to failureCode -1 and default message when event has no code or reason", () => {
+    const onError = vi.fn();
+    openRipple({ onError });
+    MockWebSocket.instance.triggerError({});
+    expect(onError).toHaveBeenCalledWith({
+      type: "err",
+      failureType: "WebSocketError",
+      failureCode: -1,
+      message: "WebSocket connection error",
+    });
+  });
+
+  // Security: prototype pollution via correlationId
+  it("does not throw when __proto__ is used as correlationId", () => {
+    openRipple();
+    expect(() => {
+      MockWebSocket.instance.triggerMessage({ type: "reply", correlationId: "__proto__", body: {} });
+    }).not.toThrow();
+  });
+
+  // Security: prototype pollution via address
+  it("does not throw when __proto__ is used as subscription address", () => {
+    openRipple();
+    expect(() => {
+      MockWebSocket.instance.triggerMessage({ type: "publish", address: "__proto__", body: {} });
+    }).not.toThrow();
   });
 });

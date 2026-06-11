@@ -31,15 +31,17 @@ beforeEach(() => {
   vi.stubGlobal("crypto", { randomUUID: () => "test-uuid" });
 });
 
+const TEST_URL = "ws://localhost:8080?token=test-token";
+
 function openRipple(options = {}) {
-  const ripple = new Ripple("ws://localhost:8080", options);
+  const ripple = new Ripple(TEST_URL, options);
   MockWebSocket.instance.triggerOpen();
   return ripple;
 }
 
 describe("Ripple", () => {
   it("transitions state on open and close", () => {
-    const ripple = new Ripple("ws://localhost:8080");
+    const ripple = new Ripple(TEST_URL);
     expect(ripple.state).toBe(Ripple.CONNECTING);
     MockWebSocket.instance.triggerOpen();
     expect(ripple.state).toBe(Ripple.OPEN);
@@ -133,8 +135,12 @@ describe("Ripple", () => {
   });
 
   it("throws INVALID_STATE_ERR when not open", () => {
-    const ripple = new Ripple("ws://localhost:8080");
+    const ripple = new Ripple(TEST_URL);
     expect(() => ripple.send("x", {})).toThrow("INVALID_STATE_ERR");
+  });
+
+  it("throws MISSING_TOKEN_ERR when token query parameter is missing from URL", () => {
+    expect(() => new Ripple("ws://localhost:8080")).toThrow("MISSING_TOKEN_ERR");
   });
 
   it("calls onError handler for unhandled err messages", () => {

@@ -70,8 +70,13 @@ export class Ripple {
   /**
    * @param {string} url
    * @param {RippleOptions} options
+   * @throws {Error} `"MISSING_TOKEN_ERR"` if `url` has no `token` query parameter.
    */
   setupWebsocket(url, options) {
+    if (!new URL(url).searchParams.get("token")) {
+      throw new Error("MISSING_TOKEN_ERR");
+    }
+
     const pingInterval = options.ping_interval || 10000;
 
     let pingTimerID;

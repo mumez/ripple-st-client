@@ -13,7 +13,7 @@ npm install ripple-st-client
 ```js
 import { Ripple } from "ripple-st-client";
 
-const ripple = new Ripple("ws://localhost:7777/ripple", {
+const ripple = new Ripple("ws://localhost:7777/ripple?token=your-token", {
   onOpen: () => console.log("connected"),
   onClose: () => console.log("disconnected"),
 });

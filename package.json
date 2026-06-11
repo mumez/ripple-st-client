@@ -1,7 +1,7 @@
 {
   "name": "ripple-st-client",
   "description": "WebSocket client for the Ripple event bus protocol",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "Masashi Umezawa",
   "bugs": {
     "url": "https://github.com/mumez/ripple-st-client/issues"
